@@ -2,74 +2,93 @@ require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
 const app = express();
-const Person = require('./models/person')
+const Person = require("./models/person");
 
 app.use(express.json());
-
-app.use(
-  morgan(":method :url :status :res[content-length] - :response-time ms :data")
-);
+app.use(express.static("build"));
+app.use(morgan("tiny"));
 
 app.get("/api/persons", (request, response) => {
+  try {
     Person.find({}).then((person) => {
-      console.log(person);
+      response.json(person);
     });
+  } catch (e) {
+    response.status(500).send("Error retrieving persons");
+  }
 });
 
 app.get("/info", (request, response) => {
-  const numPeople = persons.reduce((counter, person) => {
-    if (person.name) counter++;
-    return counter;
-  }, 0);
-
-  response.send(
-    `<p>Phonebook has info for ${numPeople} people</p><p>${new Date()}</p>`
-  );
+  try {
+    Person.countDocuments().then((count) => {
+      response.send(`<p>Phonebook has info for ${count} people</p>`);
+    });
+  } catch (e) {
+    response.status(500).send("Error retrieving person count");
+  }
 });
 
 app.get("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  const person = persons.find((person) => person.id === id);
-
-  person ? response.json(person) : response.status(404).end();
+  try {
+    Person.findById(request.params.id).then((person) => {
+      response.json(person);
+    });
+  } catch (e) {
+    response.status(500).send("Error retrieving person");
+  }
 });
 
 app.delete("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  persons = persons.filter((person) => person.id !== id);
-
-  response.status(204).end();
+  try {
+    const { id } = request.params;
+    Person.findByIdAndRemove(id).then(
+      response.status(204).send("Person deleted")
+    );
+  } catch (e) {
+    response.status(404).send(e.message);
+  }
 });
 
-const generateId = () => {
-  return Math.floor(Math.random() * 1000);
-};
-
 app.post("/api/persons", (request, response) => {
-  const body = request.body;
-
-  if (!body.name || !body.number) {
-    return response.status(400).json({
-      error: "the name or number is missing",
-    });
-  }
-
-  const personExists = persons.find((person) => person.name === body.name);
-
-  if (personExists) {
-    return response.status(400).json({
-      error: "name must be unique",
-    });
-  }
-
   const person = {
-    id: generateId(),
-    name: body.name,
-    number: body.number,
+    name: request.body.name,
+    number: request.body.number,
   };
 
-  persons = persons.concat(person);
-  response.json(person);
+  const newPerson = new Person(person);
+
+  Person.findOne({ name: person.name }).then((res) => {
+    if (res) {
+      Person.findOneAndUpdate(
+        { name: person.name },
+        { number: person.number },
+        { new: true }
+      );
+
+      return response.status(204).send('updated')
+    } else {
+      newPerson.save().then((result) => {
+        console.log("saved");
+      });
+      return response.status(204).send('saved')
+    }
+  });
+
+});
+
+app.put('/api/persons/:id', (request, response, next) => {
+  const body = request.body;
+
+  const person = {
+    name: body.name,
+    number: body.number
+  };
+
+  Person.findOneAndUpdate({name: person.name }, {number: person.number}, { new: true })
+    .then(updatedPerson => {
+      response.json(updatedPerson);
+    })
+    .catch(error => next(error));
 });
 
 const PORT = process.env.PORT;
