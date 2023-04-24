@@ -4,6 +4,7 @@ import PersonForm from "./components/PersonForm";
 import Persons from "./components/Persons";
 import personService from "./services/persons";
 import Notification from "./components/Notification";
+import { validatePerson } from "./helpers";
 
 const App = () => {
   const [persons, setPersons] = useState([]);
@@ -30,6 +31,15 @@ const App = () => {
 
   const addPerson = (event) => {
     event.preventDefault();
+
+    if (!validatePerson(newPerson)) {
+      setMessage(
+        "failed: Name must be at least 3 characters long and number must be at least 6 characters long"
+      );
+      setNewPerson({ name: "", number: "" });
+      return;
+    }
+
     const currentName = persons.filter(
       (person) => person.name === newPerson.name
     );
@@ -38,6 +48,7 @@ const App = () => {
       personService
         .create(newPerson)
         .then((returnedPerson) => {
+          console.log(returnedPerson);
           setPersons(persons.concat(returnedPerson));
           setPersonsToShow(persons.concat(returnedPerson));
           setMessage(`Added ${newPerson.name} to phonebook`);
